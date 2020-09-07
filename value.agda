@@ -11,7 +11,6 @@ data Type : {n : ℕ} → Context → Set
 data InCtx : {n : ℕ} → (Γ : Context) → {Γ' : Context} → Type {n} Γ' → Set
 data Value : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
 data UnApp : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
-data TT : {n : ℕ} → Context → Set
 
 data Context where -- A list of types
   ∅ : Context
@@ -26,8 +25,6 @@ data Type where
   Pi : ∀ {n m Γ} → (A : Type {n} Γ) → (B : Type {m} (ConsCtx {n} {Γ} {Γ} same A)) → Type {max n m} Γ
   fromValue : ∀ {n Γ} → Value {suc n} Γ (U {n}) → Type {n} Γ
 
-data TT where
-  fromValue : ∀ {n Γ} → Value {suc n} Γ (U {n}) → TT {n} Γ
 
 data InCtx where
   End : ∀ {Γ' n} → {T : Type {n} Γ'} → InCtx {n} (ConsCtx same T) {Γ'} T
