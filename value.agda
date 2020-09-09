@@ -1,5 +1,8 @@
 open import Data.Nat
 
+lemma : {a : ℕ} → a ≤ a
+lemma = {!   !}
+
 max : ℕ → ℕ → ℕ -- move this elsewhere later...
 max zero m = m
 max (suc n) zero = suc n
@@ -22,7 +25,7 @@ data _prefix_ where
 
 data Type where
   U : {n : ℕ} → {Γ : Context} → Type {suc n} Γ
-  Pi : ∀ {n m Γ} → (A : Type {n} Γ) → (B : Type {m} (ConsCtx {n} {Γ} {Γ} same A)) → Type {max n m} Γ
+  Pi : ∀ {i j k Γ} → (i ≤ k) → (i ≤ k) → (A : Type {i} Γ) → (B : Type {j} (ConsCtx {i} {Γ} {Γ} same A)) → Type {k} Γ
   fromValue : ∀ {n Γ} → Value {suc n} Γ (U {n}) → Type {n} Γ
 
 
@@ -30,26 +33,43 @@ data InCtx where
   End : ∀ {Γ' n} → {T : Type {n} Γ'} → InCtx {n} (ConsCtx same T) {Γ'} T
   Before : ∀ {Γ' Γ n} → {T : Type {n} Γ'} → {p : Γ' prefix Γ} → InCtx Γ T → InCtx (ConsCtx {n} (step {n} {Γ'} {Γ} {T} p) T) T
 
+inCtxToPrefix : ∀ {n Γ' Γ T} → InCtx {n} Γ {Γ'} T → Γ' prefix Γ
+inCtxToPrefix End = (step same)
+inCtxToPrefix (Before {Γ'} {Γ} {n} {T} {p} i) = {!   !}
+
 
 data Value where
-  Lambda : ∀ {n Γ A B} → Value {n} (ConsCtx {n} same A) B → Value Γ (Pi A B)
+  Lambda : ∀ {n Γ A B} → Value {n} (ConsCtx {n} same A) B → Value Γ (Pi {n} {n} {n} lemma lemma A B)
   fromU : ∀ {n Γ T} → UnApp {n} Γ T → Value {n} Γ T
   fromType : ∀ {n Γ} → Type {n} Γ → Value {suc n} Γ (U {n})
 
-subType : ∀{m Γ} → {A : Type {m} Γ} →
-  (v : Type {m} (ConsCtx {m} same A)) → (v₀ : Value Γ A) → Type {m} Γ
-sub : ∀{m Γ} → {A : Type {m} Γ} → {B : Type {m} (ConsCtx same A)}
-  (v : Value (ConsCtx {m} same A) B) → (v₀ : Value Γ A) → Value Γ (subType B v₀)
+subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T) → (v : Value {n} Γ' T)
+  → Context
+
+subType : ∀{n m Γ} → {A : Type {n} Γ} →
+  (v : Type {m} (ConsCtx {n} same A)) → (v₀ : Value Γ A) → Type {m} Γ
+sub : ∀{n m Γ} → {A : Type {n} Γ} → {B : Type {m} (ConsCtx same A)}
+  (v : Value (ConsCtx {n} same A) B) → (v₀ : Value Γ A) → Value Γ (subType B v₀)
+
+subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
+subCtx {n} {Γ'} {T} (ConsCtx {n} {Γ} {Γ'} (step p) T) (Before i) v
+  = (subCtx {n} {Γ'} Γ {!   !} {!   !})
+
 
 data UnApp where
   Var : ∀ {n Γ T} → InCtx {n} Γ T → UnApp Γ T
   -- TODO: replace m in A with n
-  App : ∀ {m Γ} → {A : Type {m} Γ} → {B : Type {m} (ConsCtx same A)} → UnApp Γ (Pi A B) →
+  App : ∀ {m Γ} → {A : Type {m} Γ} → {B : Type {m} (ConsCtx same A)} → UnApp Γ (Pi {m} {m} {m} lemma lemma A B) →
     (x : Value Γ A) → UnApp Γ (subType B x)
 
--- subType {m} {Γ} {A} U v₀ = U
--- subType {m} {Γ} {A} (Pi v v₁) v₀ = Pi (subType v v₀) (subType v₁ v₀)
--- subType {m} {Γ} {A} (fromValue x) v₀ = {!   !}
+
+-- subType {n} {m} {Γ} {A} U v₀ = U
+-- subType {n} {m} {Γ} {A} (Pi {i j k} A B) v₀ = ?
+-- subType {n} {m} {Γ} {A} (fromValue x) v₀ = {!   !}
+-- subType {n} {m} {Γ} {A} U v₀ =  U
+-- subType {n} {m} {Γ} {A} (Pi {i} {j} p1 p2 X Y) v₀
+  -- = Pi p1 p2 (subType X v₀) {!   !}
+-- subType {n} {m} {Γ} {A} (fromValue v) v₀ = {!   !}
 subType = {!   !}
 sub v v₀ = {! v  !}
 
