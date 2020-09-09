@@ -30,12 +30,13 @@ data Type where
 
 
 data InCtx where
-  End : ∀ {Γ' n} → {T : Type {n} Γ'} → InCtx {n} (ConsCtx same T) {Γ'} T
-  Before : ∀ {Γ' Γ n} → {T : Type {n} Γ'} → {p : Γ' prefix Γ} → InCtx Γ T → InCtx (ConsCtx {n} (step {n} {Γ'} {Γ} {T} p) T) T
+  End : ∀ {Γ n} → {T : Type {n} Γ} → InCtx {n} (ConsCtx same T) {Γ} T
+  Before : ∀ {Γ' Γ n} → {T : Type {n} Γ'} → {p : Γ' prefix Γ} → InCtx Γ T
+    → InCtx (ConsCtx {n} (step {n} {Γ'} {Γ} {T} p) T) T
 
-inCtxToPrefix : ∀ {n Γ' Γ T} → InCtx {n} Γ {Γ'} T → Γ' prefix Γ
-inCtxToPrefix End = (step same)
-inCtxToPrefix (Before {Γ'} {Γ} {n} {T} {p} i) = {!   !}
+-- inCtxToPrefix : ∀ {n Γ' Γ T} → InCtx {n} Γ {Γ'} T → Γ' prefix Γ
+-- inCtxToPrefix End = (step same)
+-- inCtxToPrefix (Before {Γ'} {Γ} {n} {T} {p} i) = {!   !}
 
 
 data Value where
@@ -45,15 +46,21 @@ data Value where
 
 subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T) → (v : Value {n} Γ' T)
   → Context
-
+-- TODO: update subType and sub to have types like subCtx
 subType : ∀{n m Γ} → {A : Type {n} Γ} →
   (v : Type {m} (ConsCtx {n} same A)) → (v₀ : Value Γ A) → Type {m} Γ
 sub : ∀{n m Γ} → {A : Type {n} Γ} → {B : Type {m} (ConsCtx same A)}
   (v : Value (ConsCtx {n} same A) B) → (v₀ : Value Γ A) → Value Γ (subType B v₀)
 
 subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
-subCtx {n} {Γ'} {T} (ConsCtx {n} {Γ} {Γ'} (step p) T) (Before i) v
-  = (subCtx {n} {Γ'} Γ {!   !} {!   !})
+subCtx {n} {Γ'} {T} (ConsCtx {n} (step {n} p) T) (Before {Γ'} {Γ} {n} {T} i) v
+  = (subCtx {n} {Γ'} {T} Γ i v)
+
+-- it should be that Γ₁ = Γ, but instead Γ'' = Γ'
+
+
+-- PROBLEM: the fact it doens't know that Γ₁ = Γ is because there is redudant
+-- informaiton in ConsCtx/prfix/InCtx
 
 
 data UnApp where
