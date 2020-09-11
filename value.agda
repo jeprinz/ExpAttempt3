@@ -1,7 +1,9 @@
 open import Data.Nat
+-- open import Agda.Builtin.Sigma
 
 lemma : {a : ℕ} → a ≤ a
-lemma = {!   !}
+lemma {zero} = z≤n
+lemma {suc a} = s≤s lemma
 
 max : ℕ → ℕ → ℕ -- move this elsewhere later...
 max zero m = m
@@ -33,6 +35,13 @@ data InCtx where
   End : ∀ {Γ n} → {T : Type {n} Γ} → InCtx {n} (ConsCtx same T) {Γ} T
   Before : ∀ {Γ'A Γ'T Γ n} → {A : Type {n} Γ'A} → {T : Type {n} Γ'T} → {p : Γ'T prefix Γ} → InCtx Γ A
     → InCtx {n} (ConsCtx {n} (step {n} {Γ'T} {Γ} {T} p) T) {Γ'A} A
+    -- A is the thing thats in the context. T is on end.
+
+-- redundancy in InCtx and prefix, leads to some annoyance later.
+-- idea:
+data InCtx2 : {n : ℕ} → (Γ : Context) → {Γ' : Context} → Type {n} Γ' → Set where
+  inctx2 : ∀{n Γ' Γ T} → (p : Γ' prefix Γ) → (ConsCtx {n} p T) prefix Γ → InCtx2 Γ T
+
 
 -- inCtxToPrefix : ∀ {n Γ' Γ T} → InCtx {n} Γ {Γ'} T → Γ' prefix Γ
 -- inCtxToPrefix End = (step same)
@@ -46,6 +55,16 @@ data Value where
 
 subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T) → (v : Value {n} Γ' T)
   → Context
+
+
+-- Alternatively, could redo the way that contexts are stored. Instead of adding types
+-- in whatever order they come, could be better structure that makes it easier to
+-- sub out a type from the middle of it.
+-- Or I could just suck it up and write the annoying code?
+-- My gut instinct tells me that there is an easier way to implement contexts;
+-- nothing else in this self representation is as terrible.
+-- Think about it tommorrow.
+
 subType : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
   → (A : Type {m} Γ) → (v : Value {n} Γ' T) → Type {m} (subCtx Γ i v)
 sub : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
@@ -64,10 +83,27 @@ sub : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
 --It should be the case that Γ = Γ1, and Γ' ≠ Γ2
 -- also, pT ≠ pA
 
--- subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
--- subCtx {n} {Γ'} {T} (ConsCtx {n} {Γ1} {Γ2} (step pA) A) (Before {Γ'} {Γ} {n} {T} {pT} i) v
-  -- = ConsCtx {n} {subCtx {n} {Γ'} {T} Γ i v} same (subType Γ i {!   !} v)
-subCtx = {!   !}
+-- (Γ'sub : Context, psub : Γ'sub prefix (subType Γ i T v), Tsub : Type Γ'sub)
+data 3Tuple : ∀ {nT nA Γ'A Γ'T T} → (Γ : Context) → (A : Type {nA} Γ'A) → (i : InCtx {nT} Γ {Γ'T} T) → Set where
+  _,_,_ : ∀ {nT nA Γ Γ'A Γ'T} → {A : Type {nA} Γ'A} → {T : Type {nT} Γ'T} → {i : InCtx {nT} Γ {Γ'T} T} → ∀ {v} → (Γ'sub : Context)
+    → (psub : Γ'sub prefix (subCtx {nT} Γ i v)) → (Asub : Type {nA} Γ'sub) → 3Tuple Γ A i
+-- should call Γ'sub instead Γ'Asub
+
+subPrefix : ∀ {nT nA Γ' Γ'T Γ T} → (p : Γ' prefix Γ) → (i : InCtx {nT} Γ {Γ'T} T)
+  → (A : Type {nA} Γ') → (v : Value {nT} Γ'T T) → 3Tuple {nT} {nA} Γ A i
+subPrefix {nT} {nA} {Γ'} {Γ'T} {Γ} {T} same i A v = (subCtx Γ' i v) , same , (subType Γ i A v)
+subPrefix {nT} {nA} {Γ'} {.Γ'} {.(ConsCtx same T)} {T} (step .same) End A v
+  = (Γ' , {!   !} , ?)
+subPrefix (step .(step _)) (Before i) A v = ({!   !} , {!   !} , ?)
+
+-- issue: names of A and T are reversed here compared to above.
+subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
+subCtx (ConsCtx (step pT) T) (Before {Γ'A} {Γ'T} {Γ} {n} {A} i) v with (subPrefix pT i T v)
+...                                                                  | (Γ'Asub , psub , Tsub)
+  = ConsCtx (step {!   !}) (subType Γ'T {!   !} T v )
+-- problem: if A to the left of Γ'T, then need to subtype. Otherwise, dont.
+-- So the issue is that when you add T onto the end of Γ, Γ might not actually
+-- be the context of T. T's context is any prefix of Γ
 -- TODO: big prob: definition of subCtx needs to depend on subType, because currently it just always returns empty ctx.
 -- THE BIG Q: will this be possible to type check in Agda?
 
