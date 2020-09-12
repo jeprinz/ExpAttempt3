@@ -1,5 +1,6 @@
 open import Data.Nat
 -- open import Agda.Builtin.Sigma
+open import Relation.Binary.PropositionalEquality
 
 lemma : {a : ℕ} → a ≤ a
 lemma {zero} = z≤n
@@ -56,15 +57,6 @@ data Value where
 subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T) → (v : Value {n} Γ' T)
   → Context
 
-
--- Alternatively, could redo the way that contexts are stored. Instead of adding types
--- in whatever order they come, could be better structure that makes it easier to
--- sub out a type from the middle of it.
--- Or I could just suck it up and write the annoying code?
--- My gut instinct tells me that there is an easier way to implement contexts;
--- nothing else in this self representation is as terrible.
--- Think about it tommorrow.
-
 subType : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
   → (A : Type {m} Γ) → (v : Value {n} Γ' T) → Type {m} (subCtx Γ i v)
 sub : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
@@ -73,39 +65,47 @@ sub : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
 -- sub : ∀{n m Γ} → {A : Type {n} Γ} → {B : Type {m} (ConsCtx same A)}
   -- (v : Value (ConsCtx {n} same A) B) → (v₀ : Value Γ A) → Value Γ (subType B v₀)
 
--- T is type in context that is being substituted
--- A is on end of context, so A ≠ T.
--- However, agda thinks that A = T. Why?
--- Γ' is context of T
--- Γ1 is context to the left of A
--- Γ2 is context of A
-
---It should be the case that Γ = Γ1, and Γ' ≠ Γ2
--- also, pT ≠ pA
-
+-- T is on end of context Γ, A is being substituted for.
 -- (Γ'sub : Context, psub : Γ'sub prefix (subType Γ i T v), Tsub : Type Γ'sub)
-data 3Tuple : ∀ {nT nA Γ'A Γ'T T} → (Γ : Context) → (A : Type {nA} Γ'A) → (i : InCtx {nT} Γ {Γ'T} T) → Set where
-  _,_,_ : ∀ {nT nA Γ Γ'A Γ'T} → {A : Type {nA} Γ'A} → {T : Type {nT} Γ'T} → {i : InCtx {nT} Γ {Γ'T} T} → ∀ {v} → (Γ'sub : Context)
-    → (psub : Γ'sub prefix (subCtx {nT} Γ i v)) → (Asub : Type {nA} Γ'sub) → 3Tuple Γ A i
--- should call Γ'sub instead Γ'Asub
+data 3Tuple : ∀ {nA nT Γ'T Γ'A A} → (Γ : Context) → (T : Type {nT} Γ'T)
+  → (v : Value {nA} Γ'A A) → (i : InCtx {nA} Γ {Γ'A} A) → Set where
+  _,_,_ : ∀ {nA nT Γ Γ'T Γ'A} → {T : Type {nT} Γ'T} → {A : Type {nA} Γ'A}
+    → {i : InCtx {nA} Γ {Γ'A} A} → ∀ {v} → (Γ'sub : Context)
+    → (psub : Γ'sub prefix (subCtx {nA} Γ i v)) → (Tsub : Type {nT} Γ'sub) → 3Tuple Γ T v i
+-- should call Γ'sub instead Γ'Tsub
 
-subPrefix : ∀ {nT nA Γ' Γ'T Γ T} → (p : Γ' prefix Γ) → (i : InCtx {nT} Γ {Γ'T} T)
-  → (A : Type {nA} Γ') → (v : Value {nT} Γ'T T) → 3Tuple {nT} {nA} Γ A i
-subPrefix {nT} {nA} {Γ'} {Γ'T} {Γ} {T} same i A v = (subCtx Γ' i v) , same , (subType Γ i A v)
-subPrefix {nT} {nA} {Γ'} {.Γ'} {.(ConsCtx same T)} {T} (step .same) End A v
-  = (Γ' , {!   !} , ?)
-subPrefix (step .(step _)) (Before i) A v = ({!   !} , {!   !} , ?)
+-- subPrefix takes a Γ' prefix Γ and a type T in context Γ' and a substitution of Γ
+-- It returns a modified Γ'sub which is a prefix of Γ after the substitution. this
+-- may be equal to Γ' or a substitution of it depending on where the substitution is.
+-- It also returns Tsub and psub, which are versions of T and the prefix that work after
+-- the substitution.
 
--- issue: names of A and T are reversed here compared to above.
+id : (T : Set) → T → T
+id T t = t
+
+facc1 : ∀ {nA nT Γ'T Γ'A Γ A} → (v : Value {nA} Γ'A A)
+  → Γ'T ≡ (subCtx (ConsCtx same A) End v)
+facc1 v = refl
+
+facc : ∀ {nA nT Γ'T Γ'A Γ A} → (v : Value {nA} Γ'A A)
+  → Γ'T prefix Γ'T → Γ'T prefix (subCtx (ConsCtx same A) End v)
+facc v p = {!   !}
+
+subPrefix : ∀ {nA nT Γ'T Γ'A Γ A} → (p : Γ'T prefix Γ) → (i : InCtx {nA} Γ {Γ'A} A)
+  → (T : Type {nT} Γ'T) → (v : Value {nA} Γ'A A) → 3Tuple {nA} {nT} Γ T v i
+-- In this case, A is on end of context, so A = T i guess?
+subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} same i T v = (subCtx Γ'T i v) , same , (subType Γ i T v)
+subPrefix {nA} {nT} {Γ'T} {Γ'A} {ConsCtx same A} {A} (step same) End T v
+  = (Γ'A , (id (Γ'T prefix (subCtx (ConsCtx same A) End v)) {!   !} ) , T)
+subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} (step p) (Before i) T v
+  = {!   !} -- ({!   !} ,  {!   !} , ?) -- recursion with subPrefix
+
 subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
 subCtx (ConsCtx (step pT) T) (Before {Γ'A} {Γ'T} {Γ} {n} {A} i) v with (subPrefix pT i T v)
-...                                                                  | (Γ'Asub , psub , Tsub)
-  = ConsCtx (step {!   !}) (subType Γ'T {!   !} T v )
--- problem: if A to the left of Γ'T, then need to subtype. Otherwise, dont.
--- So the issue is that when you add T onto the end of Γ, Γ might not actually
--- be the context of T. T's context is any prefix of Γ
--- TODO: big prob: definition of subCtx needs to depend on subType, because currently it just always returns empty ctx.
--- THE BIG Q: will this be possible to type check in Agda?
+...                                                                  | (Γ'Tsub , psub , Tsub)
+  = ConsCtx {?} {subCtx Γ i {!   !}} {Γ'Tsub} psub Tsub
+  -- = ConsCtx (step {!   !}) (subType Γ'T {!   !} T v )
+-- Will need a subvalue for subbing v in prefix of context
 
 -- subType Γ i U v = U
 -- subType {n} {m} {Γ'} {T} Γ inctx (Pi {i} {j} {m} {Γ₁} x p A B) v =
