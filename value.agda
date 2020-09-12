@@ -1,6 +1,5 @@
 open import Data.Nat
 -- open import Agda.Builtin.Sigma
-open import Relation.Binary.PropositionalEquality
 
 lemma : {a : ℕ} → a ≤ a
 lemma {zero} = z≤n
@@ -80,23 +79,12 @@ data 3Tuple : ∀ {nA nT Γ'T Γ'A A} → (Γ : Context) → (T : Type {nT} Γ'T
 -- It also returns Tsub and psub, which are versions of T and the prefix that work after
 -- the substitution.
 
-id : (T : Set) → T → T
-id T t = t
-
-facc1 : ∀ {nA nT Γ'T Γ'A Γ A} → (v : Value {nA} Γ'A A)
-  → Γ'T ≡ (subCtx (ConsCtx same A) End v)
-facc1 v = refl
-
-facc : ∀ {nA nT Γ'T Γ'A Γ A} → (v : Value {nA} Γ'A A)
-  → Γ'T prefix Γ'T → Γ'T prefix (subCtx (ConsCtx same A) End v)
-facc v p = {!   !}
-
 subPrefix : ∀ {nA nT Γ'T Γ'A Γ A} → (p : Γ'T prefix Γ) → (i : InCtx {nA} Γ {Γ'A} A)
   → (T : Type {nT} Γ'T) → (v : Value {nA} Γ'A A) → 3Tuple {nA} {nT} Γ T v i
 -- In this case, A is on end of context, so A = T i guess?
 subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} same i T v = (subCtx Γ'T i v) , same , (subType Γ i T v)
 subPrefix {nA} {nT} {Γ'T} {Γ'A} {ConsCtx same A} {A} (step same) End T v
-  = (Γ'A , (id (Γ'T prefix (subCtx (ConsCtx same A) End v)) {!   !} ) , T)
+  = (Γ'A , {!   !} , T)
 subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} (step p) (Before i) T v
   = {!   !} -- ({!   !} ,  {!   !} , ?) -- recursion with subPrefix
 
