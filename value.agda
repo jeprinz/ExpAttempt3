@@ -86,13 +86,14 @@ subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} same i T v = (subCtx Γ'T i v) , same
 subPrefix {nA} {nT} {Γ'T} {Γ'A} {ConsCtx same A} {A} (step same) End T v
   = (Γ'A , {!   !} , T)
 subPrefix {nA} {nT} {Γ'T} {Γ'A} {Γ} {A} (step p) (Before i) T v
-  = {!   !} -- ({!   !} ,  {!   !} , ?) -- recursion with subPrefix
+  = ( {!   !} , {!   !} , {!   !} )
+  -- = {!   !} -- ({!   !} ,  {!   !} , ?) -- recursion with subPrefix
 
 subCtx (ConsCtx {n} {Γ} {Γ'} same _) End v = Γ
 subCtx (ConsCtx (step pT) T) (Before {Γ'A} {Γ'T} {Γ} {n} {A} i) v with (subPrefix pT i T v)
 ...                                                                  | (Γ'Tsub , psub , Tsub)
-  = ConsCtx {?} {subCtx Γ i {!   !}} {Γ'Tsub} psub Tsub
-  -- = ConsCtx (step {!   !}) (subType Γ'T {!   !} T v )
+  = Γ
+  -- = ConsCtx {?} {subCtx Γ i {!   !}} {Γ'Tsub} psub Tsub
 -- Will need a subvalue for subbing v in prefix of context
 
 -- subType Γ i U v = U
