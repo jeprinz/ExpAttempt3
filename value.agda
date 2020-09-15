@@ -80,15 +80,39 @@ data UnApp where
     → UnApp Γ (Pi {nA} {nB} {max nA nB} lemma2 lemma3 A B) →
     (x : Value Γ A) → UnApp Γ (subType (ConsCtx Γ A) End B x)
 
+-- Ok. so top priority right now is to actually implmenent weakening.
+-- Substitution can't be made to typecheck until Agda can tell that
+-- subType(weaken T) = T.
 
--- weakenTypeStep : ∀ {n Γ T} → Type {n} Γ → Type {n} (ConsCtx Γ T)
--- weakenTypeStep U = U
--- weakenTypeStep (Pi {i} {j} p1 p2 A B)
-  -- = Pi p1 p2 (weakenTypeStep {i} A) {!   !}
--- weakenTypeStep (fromValue x) = {!   !}
+-- It doesn't make sense for the implementation of weakening to refer to InCtx.
+-- This is because it is possible to weaken things that are not part of Γ
+-- but mererly in the context Γ' where Γ' is a prefix of Γ.
 
--- weakenType End = {!   !}
--- weakenType (Before inctx) = {!   !}
+-- Its not enough to simply implement weaking one thing on end of context, because
+-- Pi constructor case then requires to weaken one to left of end for B.
+-- Therefore best course is to define a type CtxPos, which represents any
+-- spot in between (or to left or right) of elements of context. So, for a
+-- context of length n, InCtx Γ .... has n elements, but CtxPos Γ has n+1 elements.
+-- actually, it really makes more sense to just use prefixes. There are n+1
+-- prefixes of Γ.
+
+data _prefix_ : Context → Context → Set where
+  same : {Γ : Context} → Γ prefix Γ
+  step : {n : ℕ} → ∀{Γ' Γ T} → (p : Γ' prefix Γ) →  Γ' prefix (ConsCtx {n} Γ T)
+
+weakenCtx : ∀ {n Γ'} → ∀ (Γ) → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ') → Context
+weakenTypeStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
+  → Type {nT} Γ → Type {nT} (weakenCtx Γ p toAdd)
+
+weakenCtx Γ same toAdd = ConsCtx Γ toAdd
+weakenCtx (ConsCtx Γ T) (step p) toAdd
+  = ConsCtx (weakenCtx Γ p toAdd) (weakenTypeStep p toAdd T)
+
+weakenTypeStep p toAdd U = U
+weakenTypeStep {n} {nT} {G'} {G} p toAdd (Pi p1 p2 A B)
+  = Pi p1 p2 (weakenTypeStep p toAdd A) (weakenTypeStep (step p) toAdd B)
+weakenTypeStep p toAdd (fromValue x) = {!   !}
+
 weakenType = {!   !}
 
 -- weakening a type and then substituting the end of the ctx are inverses
@@ -99,6 +123,9 @@ subWeakenProof = {!   !}
 
 subValue Γ inctx (Lambda e) v = Lambda (subValue _ (Before inctx) e v)
 subValue (ConsCtx Γ' T) End {A} (fromU (Var End)) v = subWeakenProof v v
+-- If I define weakenType as doing steps with weakeneStep, and then prove that a
+-- single step canceles out with subType, then that will work for both
+-- above and below cases!
 subValue (ConsCtx Γ' T) End {_} (fromU (Var (Before inctx))) v = {!   !} -- just return the var without substitution, fromU (Var inctx)
 subValue .(ConsCtx _ _) (Before inctx) (fromU (Var x)) v = {!   !} -- recurse on subValue
 subValue Γ inctx (fromU (App x x₁)) v = {!   !}
