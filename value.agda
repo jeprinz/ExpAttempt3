@@ -1,5 +1,4 @@
 open import Data.Nat
--- open import Agda.Builtin.Sigma
 
 lemma : {a : ℕ} → a ≤ a
 lemma {zero} = z≤n
@@ -52,23 +51,14 @@ subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
 subType : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
   → (A : Type {m} Γ) → (v : Value {n} Γ' T) → Type {m} (subCtx Γ i v)
 
--- ISSUE: should be possible for A and T to be the same, but here
--- T can't ever be in context Γ because of the way End is defined.
--- HMMM: the scenario would be x : T |- T, but then it would actually
--- have to be (x : T ⊢ weaken(T)). How can this pattern match?
--- It should somehow already know that A = weaken(T). Somehow this
--- should be the only possible case!
 subValue : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
   → {A : Type {m} Γ} → (e : Value Γ A) → (v : Value {n} Γ' T)
     → Value (subCtx Γ i v) (subType Γ i A v)
-
 
 subCtx (ConsCtx Γ T) End v = Γ
 subCtx (ConsCtx Γ T) (Before i) v = ConsCtx (subCtx Γ i v) (subType Γ i T v)
 
 weakenType : ∀ {n Γ ΓT T} → InCtx {n} Γ {ΓT} T → Type {n} Γ
--- weakenValue : ∀ {n Γ ΓT T} → (i : InCtx {n} Γ {ΓT} T) → (v : Value ΓT T)
-  -- → Value Γ (weakenType i)
 
 subType Γ inctx U v = U
 subType Γ inctx (Pi p1 p2 A B) v =
@@ -80,60 +70,57 @@ data UnApp where
     → UnApp Γ (Pi {nA} {nB} {max nA nB} lemma2 lemma3 A B) →
     (x : Value Γ A) → UnApp Γ (subType (ConsCtx Γ A) End B x)
 
--- Ok. so top priority right now is to actually implmenent weakening.
--- Substitution can't be made to typecheck until Agda can tell that
--- subType(weaken T) = T.
-
--- It doesn't make sense for the implementation of weakening to refer to InCtx.
--- This is because it is possible to weaken things that are not part of Γ
--- but mererly in the context Γ' where Γ' is a prefix of Γ.
-
--- Its not enough to simply implement weaking one thing on end of context, because
--- Pi constructor case then requires to weaken one to left of end for B.
--- Therefore best course is to define a type CtxPos, which represents any
--- spot in between (or to left or right) of elements of context. So, for a
--- context of length n, InCtx Γ .... has n elements, but CtxPos Γ has n+1 elements.
--- actually, it really makes more sense to just use prefixes. There are n+1
--- prefixes of Γ.
-
 data _prefix_ : Context → Context → Set where
   same : {Γ : Context} → Γ prefix Γ
   step : {n : ℕ} → ∀{Γ' Γ T} → (p : Γ' prefix Γ) →  Γ' prefix (ConsCtx {n} Γ T)
 
-weakenCtx : ∀ {n Γ'} → ∀ (Γ) → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ') → Context
+weakenCtxStep : ∀ {n Γ'} → ∀ (Γ) → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ') → Context
 weakenTypeStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
-  → Type {nT} Γ → Type {nT} (weakenCtx Γ p toAdd)
+  → Type {nT} Γ → Type {nT} (weakenCtxStep Γ p toAdd)
+weakenValueStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
+  → {T : Type {nT} Γ} → Value {nT} Γ T
+  → Value {nT} (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
+weakenUnAppstep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
+  → {T : Type {nT} Γ} → UnApp {nT} Γ T
+  → UnApp {nT} (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
+-- weakenInCtxStep : ∀ {n nT Γ'p Γ'i Γ T} → (p : Γ'p prefix Γ) → (toAdd : Type {n} Γ')
+  -- → InCtx {nT} Γ {Γ'i} T → (Γ'isub : Context, T'isub: )
+-- TODO: plan to make this not as terrible:
+-- Define InCtx {n} Γ {Γ'} T = (Γ', T, p : (ConsCtx Γ' T) prefix Γ)
+-- make a function sortCtx : ∀{Γ1 Γ2 Γ} → (Γ1 prefix Γ) → (Γ2 prefix Γ)
+--                              → (Γ1 prefix Γ2) + (Γ2 prefix Γ1)
 
-weakenCtx Γ same toAdd = ConsCtx Γ toAdd
-weakenCtx (ConsCtx Γ T) (step p) toAdd
-  = ConsCtx (weakenCtx Γ p toAdd) (weakenTypeStep p toAdd T)
+weakenCtxStep Γ same toAdd = ConsCtx Γ toAdd
+weakenCtxStep (ConsCtx Γ T) (step p) toAdd
+  = ConsCtx (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
 
 weakenTypeStep p toAdd U = U
 weakenTypeStep {n} {nT} {G'} {G} p toAdd (Pi p1 p2 A B)
   = Pi p1 p2 (weakenTypeStep p toAdd A) (weakenTypeStep (step p) toAdd B)
-weakenTypeStep p toAdd (fromValue x) = {!   !}
+weakenTypeStep p toAdd (fromValue x) = fromValue (weakenValueStep p toAdd x)
 
-weakenType = {!   !}
+weakenValueStep p toAdd (Lambda v) = Lambda (weakenValueStep (step p) toAdd v)
+weakenValueStep p toAdd (fromU u) = fromU (weakenUnAppstep p toAdd u)
+weakenValueStep p toAdd (fromType T) = fromType (weakenTypeStep p toAdd T)
 
--- weakening a type and then substituting the end of the ctx are inverses
--- prove by pattern matching on T
-subWeakenProof : ∀ {n Γ T} → (subv retv : Value {n} Γ T)
-  → Value {n} Γ (subType (ConsCtx Γ T) End (weakenType End) subv)
-subWeakenProof = {!   !}
+
+-- TODO: subWeakenElim: P(subType(weakenTypeStep(T))) → P(T) -- I would want to use univalence here, but since I don't have it, I -- will have to do the thing where I manually code univalence for specific -- values of P. Start with P(T) = T.
+
+weakenUnAppstep p toAdd (Var i) = {!   !} -- use weakenInCtx
+weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
+  -- App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
+
+weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} End = weakenTypeStep same toAdd T
+weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (Before i) = weakenTypeStep same toAdd (weakenType i)
 
 subValue Γ inctx (Lambda e) v = Lambda (subValue _ (Before inctx) e v)
-subValue (ConsCtx Γ' T) End {A} (fromU (Var End)) v = subWeakenProof v v
--- If I define weakenType as doing steps with weakeneStep, and then prove that a
--- single step canceles out with subType, then that will work for both
--- above and below cases!
+subValue (ConsCtx Γ' T) End {A} (fromU (Var End)) v = {!   !}
+-- prove subType(weakenTypeStep T) = T for both above and below cases.
 subValue (ConsCtx Γ' T) End {_} (fromU (Var (Before inctx))) v = {!   !} -- just return the var without substitution, fromU (Var inctx)
 subValue .(ConsCtx _ _) (Before inctx) (fromU (Var x)) v = {!   !} -- recurse on subValue
+-- TODO: shouldn't sub on App case actually use eval?
 subValue Γ inctx (fromU (App x x₁)) v = {!   !}
 subValue Γ inctx (fromType T) v = fromType (subType Γ inctx T v)
-
-
--- TODO: write weaken. ITS A FUNCTION! it just transforms to a version of the
--- thing in a weaker context.
 
 -- BIG QUESTION: is there any reason that ≤ has to be defined in the way it is?
 -- what if I defined ≤ so n ≤ m for all n and m? Would anything break?
