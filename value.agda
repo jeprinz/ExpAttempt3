@@ -21,7 +21,6 @@ lemma3 {suc a} {suc b} = s≤s lemma3
 
 data Context : Set  -- A list of types
 data Type : {n : ℕ} → Context → Set
-data InCtx : {n : ℕ} → (Γ : Context) → {Γ' : Context} → Type {n} Γ' → Set
 data Value : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
 data UnApp : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
 
@@ -34,45 +33,39 @@ data Type where
   Pi : ∀ {i j k Γ} → (i ≤ k) → (j ≤ k) → (A : Type {i} Γ) → (B : Type {j} (ConsCtx Γ A)) → Type {k} Γ
   fromValue : ∀ {n Γ} → Value {suc n} Γ (U {n}) → Type {n} Γ
 
-data InCtx where
-  End : ∀ {Γ n} → {T : Type {n} Γ} → InCtx {n} (ConsCtx Γ T) {Γ} T
-  Before : ∀ {ΓA Γ nA nT} → {A : Type {nA} ΓA} → {T : Type {nT} Γ} → InCtx Γ A
-    → InCtx {nA} (ConsCtx Γ T) {ΓA} A
-    -- A is the thing thats in the context. T is on end.
+data _prefix_ : Context → Context → Set where
+  same : {Γ : Context} → Γ prefix Γ
+  step : {n : ℕ} → ∀{Γ' Γ T} → (p : Γ' prefix Γ) →  Γ' prefix (ConsCtx {n} Γ T)
 
 data Value where
   Lambda : ∀ {n Γ A B} → Value {n} (ConsCtx {n} Γ A) B → Value Γ (Pi {n} {n} {n} lemma lemma A B)
   fromU : ∀ {n Γ T} → UnApp {n} Γ T → Value {n} Γ T
   fromType : ∀ {n Γ} → Type {n} Γ → Value {suc n} Γ (U {n})
 
-subCtx : ∀ {n Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
+subCtx : ∀ {n Γ' T} → (Γ : Context) → (ConsCtx {n} Γ' T) prefix Γ
   → (v : Value {n} Γ' T) → Context
 
-subType : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
+subType : ∀{n m Γ' T} → (Γ : Context) → (i : (ConsCtx {n} Γ' T) prefix Γ)
   → (A : Type {m} Γ) → (v : Value {n} Γ' T) → Type {m} (subCtx Γ i v)
 
-subValue : ∀{n m Γ' T} → (Γ : Context) → (i : InCtx {n} Γ {Γ'} T)
+subValue : ∀{n m Γ' T} → (Γ : Context) → (i : (ConsCtx {n} Γ' T) prefix Γ)
   → {A : Type {m} Γ} → (e : Value Γ A) → (v : Value {n} Γ' T)
     → Value (subCtx Γ i v) (subType Γ i A v)
 
-subCtx (ConsCtx Γ T) End v = Γ
-subCtx (ConsCtx Γ T) (Before i) v = ConsCtx (subCtx Γ i v) (subType Γ i T v)
+subCtx (ConsCtx Γ T) same v = Γ
+subCtx (ConsCtx Γ T) (step i) v = ConsCtx (subCtx Γ i v) (subType Γ i T v)
 
-weakenType : ∀ {n Γ ΓT T} → InCtx {n} Γ {ΓT} T → Type {n} Γ
+weakenType : ∀ {n Γ ΓT T} → (ConsCtx {n} ΓT T) prefix Γ → Type {n} Γ
 
 subType Γ inctx U v = U
 subType Γ inctx (Pi p1 p2 A B) v =
-  Pi p1 p2 (subType Γ inctx A v) (subType (ConsCtx Γ A) (Before inctx) B v)
+  Pi p1 p2 (subType Γ inctx A v) (subType (ConsCtx Γ A) (step inctx) B v)
 subType Γ inctx (fromValue x) v = fromValue (subValue Γ inctx x v)
 data UnApp where
-  Var : ∀ {n Γ ΓT T} → (i : InCtx {n} Γ {ΓT} T) → UnApp Γ (weakenType i)
+  Var : ∀ {n Γ ΓT T} → (i : (ConsCtx {n} ΓT T) prefix Γ) → UnApp Γ (weakenType i)
   App : ∀ {nA nB Γ} → {A : Type {nA} Γ} → {B : Type {nB} (ConsCtx Γ A)}
     → UnApp Γ (Pi {nA} {nB} {max nA nB} lemma2 lemma3 A B) →
-    (x : Value Γ A) → UnApp Γ (subType (ConsCtx Γ A) End B x)
-
-data _prefix_ : Context → Context → Set where
-  same : {Γ : Context} → Γ prefix Γ
-  step : {n : ℕ} → ∀{Γ' Γ T} → (p : Γ' prefix Γ) →  Γ' prefix (ConsCtx {n} Γ T)
+    (x : Value Γ A) → UnApp Γ (subType (ConsCtx Γ A) same B x)
 
 weakenCtxStep : ∀ {n Γ'} → ∀ (Γ) → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ') → Context
 weakenTypeStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
@@ -110,14 +103,14 @@ weakenUnAppstep p toAdd (Var i) = {!   !} -- use weakenInCtx
 weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
   -- App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
 
-weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} End = weakenTypeStep same toAdd T
-weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (Before i) = weakenTypeStep same toAdd (weakenType i)
+weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} same = weakenTypeStep same toAdd T
+weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (step i) = weakenTypeStep same toAdd (weakenType i)
 
-subValue Γ inctx (Lambda e) v = Lambda (subValue _ (Before inctx) e v)
-subValue (ConsCtx Γ' T) End {A} (fromU (Var End)) v = {!   !}
+subValue Γ inctx (Lambda e) v = Lambda (subValue _ (step inctx) e v)
+subValue (ConsCtx Γ' T) same {A} (fromU (Var same)) v = {!   !}
 -- prove subType(weakenTypeStep T) = T for both above and below cases.
-subValue (ConsCtx Γ' T) End {_} (fromU (Var (Before inctx))) v = {!   !} -- just return the var without substitution, fromU (Var inctx)
-subValue .(ConsCtx _ _) (Before inctx) (fromU (Var x)) v = {!   !} -- recurse on subValue
+subValue (ConsCtx Γ' T) same {_} (fromU (Var (step inctx))) v = {!   !} -- just return the var without substitution, fromU (Var inctx)
+subValue .(ConsCtx _ _) (step inctx) (fromU (Var x)) v = {!   !} -- recurse on subValue
 -- TODO: shouldn't sub on App case actually use eval?
 subValue Γ inctx (fromU (App x x₁)) v = {!   !}
 subValue Γ inctx (fromType T) v = fromType (subType Γ inctx T v)
