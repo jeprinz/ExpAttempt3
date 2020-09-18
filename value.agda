@@ -1,4 +1,5 @@
 open import Data.Nat
+open import Relation.Binary.PropositionalEquality
 
 lemma : {a : ℕ} → a ≤ a
 lemma {zero} = z≤n
@@ -109,13 +110,18 @@ weakenValueStep p toAdd (Lambda v) = Lambda (weakenValueStep (step p) toAdd v)
 weakenValueStep p toAdd (fromU u) = fromU (weakenUnAppstep p toAdd u)
 weakenValueStep p toAdd (fromType T) = fromType (weakenTypeStep p toAdd T)
 
--- TODO: subWeakenElim: P(subType(weakenTypeStep(T))) → P(T) -- I would want to use univalence here, but since I don't have it, I -- will have to do the thing where I manually code univalence for specific -- values of P. Start with P(T) = T.
 weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} same = weakenTypeStep same toAdd T
 weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (step i) = weakenTypeStep same toAdd (weakenType i)
 
--- TODO: jacob: next time: write weakenInCtxStep.
-weakenUnAppstep p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
-... | inctx Γ' T pre = {!   !}
+-- weakenAbsorb : ∀{nT nA Γ Γ'T Γ'A T toAdd} → (pA : Γ'A prefix Γ)
+--   → (i2 : (ConsCtx {nT} Γ'T T) prefix Γ)
+--   → (p : Γ'T prefix Γ) → (i1 : (ConsCtx Γ'T T) prefix (weakenCtxStep Γ pA toAdd))
+--   → weakenType i1 ≡ weakenTypeStep {nA} pA toAdd (weakenType i2)
+-- weakenAbsorb {_} {_} {_} {_} {_} {_} {toAdd} pA i2 p i1 = -- gets stuck on case i1, so probably something isn't as generic as its supposed to be in type.
+--   indPrefix (λ i1' → (weakenType i1' ≡ weakenTypeStep pA toAdd (weakenType i2))) ? ? ?
+
+weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
+... | inctx Γ' T pre = {!   !} -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
 weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
   -- = App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
 
