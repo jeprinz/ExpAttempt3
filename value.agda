@@ -57,10 +57,10 @@ subCtx (ConsCtx Γ T) (step i) v = ConsCtx (subCtx Γ i v) (subType Γ i T v)
 
 weakenType : ∀ {n Γ ΓT T} → (ConsCtx {n} ΓT T) prefix Γ → Type {n} Γ
 
-subType Γ inctx U v = U
-subType Γ inctx (Pi p1 p2 A B) v =
-  Pi p1 p2 (subType Γ inctx A v) (subType (ConsCtx Γ A) (step inctx) B v)
-subType Γ inctx (fromValue x) v = fromValue (subValue Γ inctx x v)
+subType Γ icx U v = U
+subType Γ icx (Pi p1 p2 A B) v =
+  Pi p1 p2 (subType Γ icx A v) (subType (ConsCtx Γ A) (step icx) B v)
+subType Γ icx (fromValue x) v = fromValue (subValue Γ icx x v)
 data UnApp where
   Var : ∀ {n Γ ΓT T} → (i : (ConsCtx {n} ΓT T) prefix Γ) → UnApp Γ (weakenType i)
   App : ∀ {nA nB Γ} → {A : Type {nA} Γ} → {B : Type {nB} (ConsCtx Γ A)}
@@ -76,16 +76,29 @@ weakenValueStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n
 weakenUnAppstep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
   → {T : Type {nT} Γ} → UnApp {nT} Γ T
   → UnApp {nT} (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
--- weakenInCtxStep : ∀ {n nT Γ'p Γ'i Γ T} → (p : Γ'p prefix Γ) → (toAdd : Type {n} Γ')
-  -- → InCtx {nT} Γ {Γ'i} T → (Γ'isub : Context, T'isub: )
 -- TODO: plan to make this not as terrible:
 -- Define InCtx {n} Γ {Γ'} T = (Γ', T, p : (ConsCtx Γ' T) prefix Γ)
 -- make a function sortCtx : ∀{Γ1 Γ2 Γ} → (Γ1 prefix Γ) → (Γ2 prefix Γ)
 --                              → (Γ1 prefix Γ2) + (Γ2 prefix Γ1)
 
+data InCtx : Context → Set where
+  inctx : ∀{n Γ} → ∀(Γ') → ∀(T) → (ConsCtx {n} Γ' T) prefix Γ → InCtx Γ
+
 weakenCtxStep Γ same toAdd = ConsCtx Γ toAdd
 weakenCtxStep (ConsCtx Γ T) (step p) toAdd
   = ConsCtx (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
+
+-- TODO: next time: figure this out. Its suppose to take an InCtx
+-- and a substitution and give the new version of the sub.
+-- To see what type it should return, look at var case of weakenUnAppstep below.
+weakenInCtxStep : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p prefix Γ)
+  → (toAdd : Type {n} Γ'p) → (ConsCtx {nT} Γ'T T) prefix Γ
+  → InCtx (weakenCtxStep Γ p toAdd)
+weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) -- toAdd on end
+weakenInCtxStep Γ'T T (step p) toAdd same
+  = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same  -- T on end
+weakenInCtxStep Γ'T T (step p) toAdd (step icx) with (weakenInCtxStep Γ'T T p toAdd icx) -- recurse
+... | inctx Γ'sub Tsub pre = inctx Γ'sub Tsub (step pre)
 
 weakenTypeStep p toAdd U = U
 weakenTypeStep {n} {nT} {G'} {G} p toAdd (Pi p1 p2 A B)
@@ -96,24 +109,24 @@ weakenValueStep p toAdd (Lambda v) = Lambda (weakenValueStep (step p) toAdd v)
 weakenValueStep p toAdd (fromU u) = fromU (weakenUnAppstep p toAdd u)
 weakenValueStep p toAdd (fromType T) = fromType (weakenTypeStep p toAdd T)
 
-
 -- TODO: subWeakenElim: P(subType(weakenTypeStep(T))) → P(T) -- I would want to use univalence here, but since I don't have it, I -- will have to do the thing where I manually code univalence for specific -- values of P. Start with P(T) = T.
-
-weakenUnAppstep p toAdd (Var i) = {!   !} -- use weakenInCtx
-weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
-  -- App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
-
 weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} same = weakenTypeStep same toAdd T
 weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (step i) = weakenTypeStep same toAdd (weakenType i)
 
-subValue Γ inctx (Lambda e) v = Lambda (subValue _ (step inctx) e v)
+-- TODO: jacob: next time: write weakenInCtxStep.
+weakenUnAppstep p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
+... | inctx Γ' T pre = {!   !}
+weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
+  -- = App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
+
+subValue Γ icx (Lambda e) v = Lambda (subValue _ (step icx) e v)
 subValue (ConsCtx Γ' T) same {A} (fromU (Var same)) v = {!   !}
 -- prove subType(weakenTypeStep T) = T for both above and below cases.
-subValue (ConsCtx Γ' T) same {_} (fromU (Var (step inctx))) v = {!   !} -- just return the var without substitution, fromU (Var inctx)
-subValue .(ConsCtx _ _) (step inctx) (fromU (Var x)) v = {!   !} -- recurse on subValue
+subValue (ConsCtx Γ' T) same {_} (fromU (Var (step icx))) v = {!   !} -- just return the var without substitution, fromU (Var icx)
+subValue .(ConsCtx _ _) (step icx) (fromU (Var x)) v = {!   !} -- recurse on subValue
 -- TODO: shouldn't sub on App case actually use eval?
-subValue Γ inctx (fromU (App x x₁)) v = {!   !}
-subValue Γ inctx (fromType T) v = fromType (subType Γ inctx T v)
+subValue Γ icx (fromU (App x x₁)) v = {!   !}
+subValue Γ icx (fromType T) v = fromType (subType Γ icx T v)
 
 -- BIG QUESTION: is there any reason that ≤ has to be defined in the way it is?
 -- what if I defined ≤ so n ≤ m for all n and m? Would anything break?
