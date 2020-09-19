@@ -56,14 +56,18 @@ subValue : ∀{n m Γ' T} → (Γ : Context) → (i : (ConsCtx {n} Γ' T) prefix
 subCtx (ConsCtx Γ T) same v = Γ
 subCtx (ConsCtx Γ T) (step i) v = ConsCtx (subCtx Γ i v) (subType Γ i T v)
 
-weakenType : ∀ {n Γ ΓT T} → (ConsCtx {n} ΓT T) prefix Γ → Type {n} Γ
+weakenType : ∀ {n Γ ΓT} → (T : Type {n} ΓT) → ΓT prefix Γ → Type {n} Γ
+
+prefixFact : ∀{n Γ' T Γ} → (ConsCtx {n} Γ' T) prefix Γ → Γ' prefix Γ
+prefixFact same = step same
+prefixFact (step p) = step (prefixFact p)
 
 subType Γ icx U v = U
 subType Γ icx (Pi p1 p2 A B) v =
   Pi p1 p2 (subType Γ icx A v) (subType (ConsCtx Γ A) (step icx) B v)
 subType Γ icx (fromValue x) v = fromValue (subValue Γ icx x v)
 data UnApp where
-  Var : ∀ {n Γ ΓT T} → (i : (ConsCtx {n} ΓT T) prefix Γ) → UnApp Γ (weakenType i)
+  Var : ∀ {n Γ ΓT T} → (i : (ConsCtx {n} ΓT T) prefix Γ) → UnApp Γ (weakenType T (prefixFact i))
   App : ∀ {nA nB Γ} → {A : Type {nA} Γ} → {B : Type {nB} (ConsCtx Γ A)}
     → UnApp Γ (Pi {nA} {nB} {max nA nB} lemma2 lemma3 A B) →
     (x : Value Γ A) → UnApp Γ (subType (ConsCtx Γ A) same B x)
@@ -110,16 +114,23 @@ weakenValueStep p toAdd (Lambda v) = Lambda (weakenValueStep (step p) toAdd v)
 weakenValueStep p toAdd (fromU u) = fromU (weakenUnAppstep p toAdd u)
 weakenValueStep p toAdd (fromType T) = fromType (weakenTypeStep p toAdd T)
 
-weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} same = weakenTypeStep same toAdd T
-weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (step i) = weakenTypeStep same toAdd (weakenType i)
+-- weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} same = weakenTypeStep same toAdd T
+-- weakenType {n} {(ConsCtx Γ' toAdd)} {ΓT} {T} (step i) = weakenTypeStep same toAdd (weakenType i)
+weakenType T same = T
+weakenType T (step {_} {_} {_} {toAdd} p) = weakenTypeStep same toAdd (weakenType T p)
 
--- weakenAbsorb : ∀{nT nA Γ Γ'T Γ'A T toAdd} → (pA : Γ'A prefix Γ)
---   → (i2 : (ConsCtx {nT} Γ'T T) prefix Γ)
---   → (p : Γ'T prefix Γ) → (i1 : (ConsCtx Γ'T T) prefix (weakenCtxStep Γ pA toAdd))
---   → weakenType i1 ≡ weakenTypeStep {nA} pA toAdd (weakenType i2)
--- weakenAbsorb {_} {_} {_} {_} {_} {_} {toAdd} pA i2 p i1 = -- gets stuck on case i1, so probably something isn't as generic as its supposed to be in type.
---   indPrefix (λ i1' → (weakenType i1' ≡ weakenTypeStep pA toAdd (weakenType i2))) ? ? ?
+weakenAbsorb : ∀{nT nA Γ Γ' T Γ'A toAdd} → (pA : Γ'A prefix Γ)
+  → (i2 : Γ' prefix Γ)
+  → (i1 : Γ' prefix (weakenCtxStep Γ pA toAdd))
+  → weakenType {nT} T i1 ≡ weakenTypeStep {nA} pA toAdd (weakenType T i2)
+-- gets stuck on case i1, so probably something isn't as generic as its supposed to be in type.
+weakenAbsorb {_} {_} {_} {_} {T} {_} {toAdd} same same (step i1) = {!   !}
+weakenAbsorb {_} {_} {_} {_} {T} {_} {toAdd} (step pA) same i1 = {!   !}
+weakenAbsorb {_} {_} {_} {_} {_} {_} {toAdd} pA (step i2) i1 = {!   !}
 
+-- TODO: 1) use weakenAbsorb to write below function with something that is
+-- Var pre, but translated on an equivalence from weakenAbsorb
+-- 2) implement weakenAbsorb
 weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
 ... | inctx Γ' T pre = {!   !} -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
 weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
