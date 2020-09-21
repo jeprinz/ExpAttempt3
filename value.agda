@@ -93,9 +93,6 @@ weakenCtxStep Γ same toAdd = ConsCtx Γ toAdd
 weakenCtxStep (ConsCtx Γ T) (step p) toAdd
   = ConsCtx (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
 
--- TODO: next time: figure this out. Its suppose to take an InCtx
--- and a substitution and give the new version of the sub.
--- To see what type it should return, look at var case of weakenUnAppstep below.
 weakenInCtxStep : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p prefix Γ)
   → (toAdd : Type {n} Γ'p) → (ConsCtx {nT} Γ'T T) prefix Γ
   → InCtx (weakenCtxStep Γ p toAdd)
@@ -131,8 +128,13 @@ weakenAbsorb {_} {_} {_} {_} {_} {_} {toAdd} pA (step i2) i1 = {!   !}
 -- TODO: 1) use weakenAbsorb to write below function with something that is
 -- Var pre, but translated on an equivalence from weakenAbsorb
 -- 2) implement weakenAbsorb
+-- TODO: new idea after further consideration:
+-- Should have proof of equality in InCtx, returned by weakenInCtxStep.
+-- Should show that weakenTypeStep (weaken T) = weaken Tsub
 weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
-... | inctx Γ' T pre = {!   !} -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
+... | inctx Γ' T pre = -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
+  let equiv = weakenAbsorb {_} {_} {_} {_} {_} p (prefixFact i) {!   !} -- hole should be (prefixFact pre)
+  in {!   !}
 weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
   -- = App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
 
