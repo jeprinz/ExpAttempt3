@@ -81,26 +81,10 @@ weakenValueStep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n
 weakenUnAppstep : ∀ {n nT Γ' Γ} → (p : Γ' prefix Γ) → (toAdd : Type {n} Γ')
   → {T : Type {nT} Γ} → UnApp {nT} Γ T
   → UnApp {nT} (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
--- TODO: plan to make this not as terrible:
--- Define InCtx {n} Γ {Γ'} T = (Γ', T, p : (ConsCtx Γ' T) prefix Γ)
--- make a function sortCtx : ∀{Γ1 Γ2 Γ} → (Γ1 prefix Γ) → (Γ2 prefix Γ)
---                              → (Γ1 prefix Γ2) + (Γ2 prefix Γ1)
-
-data InCtx : Context → Set where
-  inctx : ∀{n Γ} → ∀(Γ') → ∀(T) → (ConsCtx {n} Γ' T) prefix Γ → InCtx Γ
 
 weakenCtxStep Γ same toAdd = ConsCtx Γ toAdd
 weakenCtxStep (ConsCtx Γ T) (step p) toAdd
   = ConsCtx (weakenCtxStep Γ p toAdd) (weakenTypeStep p toAdd T)
-
-weakenInCtxStep : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p prefix Γ)
-  → (toAdd : Type {n} Γ'p) → (ConsCtx {nT} Γ'T T) prefix Γ
-  → InCtx (weakenCtxStep Γ p toAdd)
-weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) -- toAdd on end
-weakenInCtxStep Γ'T T (step p) toAdd same
-  = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same  -- T on end
-weakenInCtxStep Γ'T T (step p) toAdd (step icx) with (weakenInCtxStep Γ'T T p toAdd icx) -- recurse
-... | inctx Γ'sub Tsub pre = inctx Γ'sub Tsub (step pre)
 
 weakenTypeStep p toAdd U = U
 weakenTypeStep {n} {nT} {G'} {G} p toAdd (Pi p1 p2 A B)
@@ -116,25 +100,46 @@ weakenValueStep p toAdd (fromType T) = fromType (weakenTypeStep p toAdd T)
 weakenType T same = T
 weakenType T (step {_} {_} {_} {toAdd} p) = weakenTypeStep same toAdd (weakenType T p)
 
-weakenAbsorb : ∀{nT nA Γ Γ' T Γ'A toAdd} → (pA : Γ'A prefix Γ)
-  → (i2 : Γ' prefix Γ)
-  → (i1 : Γ' prefix (weakenCtxStep Γ pA toAdd))
-  → weakenType {nT} T i1 ≡ weakenTypeStep {nA} pA toAdd (weakenType T i2)
--- gets stuck on case i1, so probably something isn't as generic as its supposed to be in type.
-weakenAbsorb {_} {_} {_} {_} {T} {_} {toAdd} same same (step i1) = {!   !}
-weakenAbsorb {_} {_} {_} {_} {T} {_} {toAdd} (step pA) same i1 = {!   !}
-weakenAbsorb {_} {_} {_} {_} {_} {_} {toAdd} pA (step i2) i1 = {!   !}
+-- What i really want is to make weakenInCtxStep return a dependent tuple with
+-- various information in it. Unfortunately, agda doesn't have that. So instead,
+-- I have to define a type that will store that information. The parameters of
+-- the type are the things in the context in weakenInCtxStep that I need to refer
+-- to. The arguments of the single constructor are the elements of the tuple.
+-- data InCtx : ∀{nT nA Γ'} → (ΓT Γ : Context) → (T : Type {nT} ΓT)
+  -- → (toAdd : Type {nA} Γ') → (p : Γ' prefix Γ) → Set where
+  -- inctx : ∀{nT ΓT T Γ Γ' nA p toAdd} → ∀(ΓTsub) → ∀(Tsub)
+    -- → (ConsCtx {nT} ΓTsub Tsub) prefix (weakenCtxStep Γ p toAdd) → InCtx ΓT Γ T toAdd p
 
--- TODO: 1) use weakenAbsorb to write below function with something that is
--- Var pre, but translated on an equivalence from weakenAbsorb
--- 2) implement weakenAbsorb
+data InCtx : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p prefix Γ)
+  → (toAdd : Type {n} Γ'p) → (ConsCtx {nT} Γ'T T) prefix Γ → Set where
+  inctx : ∀ {n nT Γ'p Γ} → ∀{Γ'T} → ∀{T} → {p : Γ'p prefix Γ}
+    → {toAdd : Type {n} Γ'p} → {icx : (ConsCtx {nT} Γ'T T) prefix Γ}
+    → ∀(ΓTsub) → ∀(Tsub) -- terms of tuple start here
+    → (icxsub : (ConsCtx {nT} ΓTsub Tsub) prefix (weakenCtxStep Γ p toAdd))
+    → (equivalence : weakenType Tsub (prefixFact icxsub)
+      ≡ weakenTypeStep p toAdd (weakenType T (prefixFact icx)))-- and end here
+    → InCtx Γ'T T p toAdd icx
+
+weakenInCtxStep : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p prefix Γ)
+  → (toAdd : Type {n} Γ'p) → (icx : (ConsCtx {nT} Γ'T T) prefix Γ)
+  → InCtx Γ'T T p toAdd icx
+weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) refl -- toAdd on end
+weakenInCtxStep Γ'T T (step p) toAdd same -- T on end
+  = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same {!   !}
+weakenInCtxStep Γ'T T (step p) toAdd (step icx) = {!   !} -- recurse
+-- weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) -- toAdd on end
+-- weakenInCtxStep Γ'T T (step p) toAdd same
+  -- = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same  -- T on end
+-- weakenInCtxStep Γ'T T (step p) toAdd (step icx) with (weakenInCtxStep Γ'T T p toAdd icx) -- recurse
+-- ... | inctx Γ'sub Tsub pre = inctx Γ'sub Tsub (step pre)
+
 -- TODO: new idea after further consideration:
 -- Should have proof of equality in InCtx, returned by weakenInCtxStep.
 -- Should show that weakenTypeStep (weaken T) = weaken Tsub
-weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
-... | inctx Γ' T pre = -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
-  let equiv = weakenAbsorb {_} {_} {_} {_} {_} p (prefixFact i) {!   !} -- hole should be (prefixFact pre)
-  in {!   !}
+weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i)  = {!   !} -- with weakenInCtxStep _ _ p toAdd i
+-- ... | inctx Γ' T pre toAdd p = -- Var pre -- Var {_} {weakenCtxStep Γ p toAdd} ?
+  -- let equiv = weakenAbsorb {_} {_} {_} {_} {_} p (prefixFact i) {!   !} -- hole should be (prefixFact pre)
+  -- in {!   !}
 weakenUnAppstep p toAdd (App u v) = {!    !} -- will need subType(weakenTypeStep T) = T proof. Apply to substitute in type. might need to use trick where I manually implement univalence for a specific case.
   -- = App (weakenUnAppstep p toAdd u) (weakenValueStep p toAdd v)
 
