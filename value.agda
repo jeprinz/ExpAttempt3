@@ -1,3 +1,4 @@
+
 open import Data.Nat
 open import Relation.Binary.PropositionalEquality
 
@@ -25,19 +26,23 @@ data Type : {n : ℕ} → Context → Set
 data Value : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
 data UnApp : {n : ℕ} → (Γ : Context) → (t : Type {n} Γ) → Set
 
+{-# NO_POSITIVITY_CHECK #-}
 data Context where -- A list of types
   ∅ : Context
   ConsCtx : ∀ {n} → (Γ : Context) →  Type {n} Γ → Context
 
+{-# NO_POSITIVITY_CHECK #-}
 data Type where
   U : {n : ℕ} → {Γ : Context} → Type {suc n} Γ
   Pi : ∀ {i j k Γ} → (i ≤ k) → (j ≤ k) → (A : Type {i} Γ) → (B : Type {j} (ConsCtx Γ A)) → Type {k} Γ
   fromValue : ∀ {n Γ} → Value {suc n} Γ (U {n}) → Type {n} Γ
 
+{-# NO_POSITIVITY_CHECK #-}
 data _prefix_ : Context → Context → Set where
   same : {Γ : Context} → Γ prefix Γ
   step : {n : ℕ} → ∀{Γ' Γ T} → (p : Γ' prefix Γ) →  Γ' prefix (ConsCtx {n} Γ T)
 
+{-# NO_POSITIVITY_CHECK #-}
 data Value where
   Lambda : ∀ {n Γ A B} → Value {n} (ConsCtx {n} Γ A) B → Value Γ (Pi {n} {n} {n} lemma lemma A B)
   fromU : ∀ {n Γ T} → UnApp {n} Γ T → Value {n} Γ T
@@ -126,7 +131,8 @@ weakenInCtxStep : ∀ {n nT Γ'p Γ} → ∀(Γ'T) → ∀(T) → (p : Γ'p pref
 weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) refl -- toAdd on end
 weakenInCtxStep Γ'T T (step p) toAdd same -- T on end
   = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same {!   !}
-weakenInCtxStep Γ'T T (step p) toAdd (step icx) = {!   !} -- recurse
+weakenInCtxStep Γ'T T (step p) toAdd (step icx) with (weakenInCtxStep Γ'T T p toAdd icx) -- recurse
+... | inctx ΓTsub Tsub icxsub equivalence = inctx ΓTsub Tsub (step icxsub) {!   !}
 -- weakenInCtxStep Γ'T T same toAdd icx = inctx Γ'T T (step icx) -- toAdd on end
 -- weakenInCtxStep Γ'T T (step p) toAdd same
   -- = inctx (weakenCtxStep Γ'T p toAdd) (weakenTypeStep p toAdd T) same  -- T on end
@@ -136,6 +142,7 @@ weakenInCtxStep Γ'T T (step p) toAdd (step icx) = {!   !} -- recurse
 -- TODO: new idea after further consideration:
 -- Should have proof of equality in InCtx, returned by weakenInCtxStep.
 -- Should show that weakenTypeStep (weaken T) = weaken Tsub
+{-# TERMINATING  #-}
 weakenUnAppstep {_} {_} {_} {Γ} p toAdd (Var i) with weakenInCtxStep _ _ p toAdd i
 ... | inctx ΓTsub Tsub icxsub equivalence
   -- = {!   !}
